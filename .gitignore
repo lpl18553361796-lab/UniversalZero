@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+venv311/
+env/
+.env
+
+# Temporary Data
+temp/
+temp_strong/
+temp_transfer/
+temp_hex/
+*.pth.tar
+*.png
+
+# IDEs
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
