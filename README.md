@@ -73,4 +73,3 @@ python gui.py hex
 - `transfer.py`: Weight transfer utility.
 
 ---
-*Built with ❤️ by Antigravity*
