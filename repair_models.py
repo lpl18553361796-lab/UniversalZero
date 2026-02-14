@@ -19,7 +19,7 @@ def main():
 
     print("\n=== 正在生成兼容 9x9 架构的临时模型 (Breakthrough) ===")
     g = BreakthroughGame()
-    nnet = NNetWrapper(g)
+    nnet = NNetWrapper(g, game_id='breakthrough')
     
     # 2. 使用极速配置 (只跑 1 轮，只为了生成文件)
     # 这样你就不用等几十分钟了，马上就能看 GUI

@@ -1,3 +1,6 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import time
 from breakthrough import BreakthroughGame
@@ -28,7 +31,7 @@ def main():
         # --- 2. 获取合法动作 ---
         # 注意：这里传 1，因为在 canonical_board 上，当前玩家永远是 1
         valid_moves_mask = game.get_valid_moves(canonical_board, 1)
-        
+
         # 检查是不是无路可走了 (被堵死)
         if np.sum(valid_moves_mask) == 0:
             print(f"玩家 {player} 无路可走，判负！")
@@ -54,7 +57,7 @@ def main():
         # --- 7. 判断胜负 ---
         # 注意：这里我们判断 canonical_board，看当前玩家有没有到达"顶端"
         game_over = game.get_game_ended(canonical_board, 1)
-        
+
         if game_over != 0:
             # game_over=1 表示当前行动者赢了
             winner = player if game_over == 1 else -player
@@ -66,7 +69,7 @@ def main():
 
         # 切换玩家
         player = -player
-        
+
         # 暂停 0.5 秒让我们看清楚
         time.sleep(0.5)
 

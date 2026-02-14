@@ -9,7 +9,7 @@ def main():
     print("正在使用与 Breakthrough 完全相同的 AI 引擎...")
     
     g = HexGame(n=7) # 使用 7x7 棋盘
-    nnet = NNetWrapper(g) # 神经网络自动适应新尺寸
+    nnet = NNetWrapper(g, game_id='hex') # 神经网络自动适应新尺寸
 
     args = dotdict({
         'numIters': 2,

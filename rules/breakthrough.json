@@ -1,0 +1,28 @@
+{
+  "id": "breakthrough_json",
+  "name": "Breakthrough",
+  "board": {
+    "geometry": "square",
+    "size": 8,
+    "canonical_transform": "flip_vertical"
+  },
+  "pieces": {
+    "initial_rows": {
+      "player_1": [6, 7],
+      "player_neg1": [0, 1]
+    }
+  },
+  "actions": {
+    "mode": "move_from_to",
+    "move_vectors": [[-1, -1], [-1, 0], [-1, 1]],
+    "capture_rules": {
+      "straight_capture": false,
+      "diagonal_capture_enemy_only": true
+    }
+  },
+  "end_condition": {
+    "type": "reach_rank",
+    "target_rank": 7,
+    "elimination": true
+  }
+}

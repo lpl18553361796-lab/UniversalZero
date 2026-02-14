@@ -1,0 +1,19 @@
+{
+  "id": "hex_json",
+  "name": "Hex",
+  "board": {
+    "geometry": "hexagonal",
+    "size": 7,
+    "canonical_transform": "transpose",
+    "adjacency": [[-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0]]
+  },
+  "pieces": {},
+  "actions": {
+    "mode": "place"
+  },
+  "end_condition": {
+    "type": "connectivity",
+    "player_1_axis": "vertical",
+    "player_neg1_axis": "horizontal"
+  }
+}

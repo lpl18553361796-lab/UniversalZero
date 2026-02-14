@@ -9,7 +9,7 @@ def main():
     
     # 1. 初始化
     g = BreakthroughGame()
-    nnet = NNetWrapper(g)
+    nnet = NNetWrapper(g, game_id='breakthrough')
 
     # 2. 配置参数 (轻量级测试配置)
     args = dotdict({

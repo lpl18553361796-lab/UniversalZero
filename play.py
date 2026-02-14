@@ -56,7 +56,7 @@ def main():
     
     # 1. 初始化
     game = BreakthroughGame()
-    nnet = NNetWrapper(game)
+    nnet = NNetWrapper(game, game_id='breakthrough')
     
     # 2. 加载模型
     checkpoint_path = './temp/'

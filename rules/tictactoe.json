@@ -1,0 +1,17 @@
+{
+  "id": "tictactoe",
+  "name": "TicTacToe",
+  "board": {
+    "geometry": "square",
+    "size": 3,
+    "canonical_transform": "negate"
+  },
+  "pieces": {},
+  "actions": {
+    "mode": "place"
+  },
+  "end_condition": {
+    "type": "n_in_a_row",
+    "n": 3
+  }
+}

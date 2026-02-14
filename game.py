@@ -102,7 +102,13 @@ def register_game(name, game_class):
 def get_game_by_id(name, **kwargs):
     """
     根据 ID 获取游戏实例。
+    支持两种注册形式：
+      - 类 (class): 调用 cls(**kwargs) 创建新实例
+      - 实例 (instance): 直接返回已注册的实例
     """
     if name not in GAME_REGISTRY:
         raise ValueError(f"Game '{name}' not found in registry. Available games: {list(GAME_REGISTRY.keys())}")
-    return GAME_REGISTRY[name](**kwargs)
+    entry = GAME_REGISTRY[name]
+    if isinstance(entry, type):
+        return entry(**kwargs)
+    return entry
