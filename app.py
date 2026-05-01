@@ -291,14 +291,16 @@ def board_section(game, mcts_args):
         st.success(st.session_state.game_message)
         if st.button("Play Again", type="primary"):
             start_new_game(st.session_state.game_id)
-            st.rerun()
+            st.rerun(scope="fragment")
         return
+
+    selected = st.session_state.get('selected_piece', None)
+    if is_move and selected:
+        st.warning(f"**Selected ({selected[0]},{selected[1]})** — click destination to move")
+    elif player == 1:
+        st.info("Your turn (White) — click on the board")
     else:
-        selected = st.session_state.get('selected_piece', None)
-        if is_move and selected:
-            st.info(f"Selected ({selected[0]},{selected[1]}) — click destination")
-        else:
-            st.info("Your turn (W) — click on the board" if player == 1 else "AI thinking...")
+        st.info("AI thinking...")
 
     # --- 计算合法动作 ---
     valid_cells = None
@@ -378,7 +380,7 @@ def _handle_board_click(game, board, n, player, r, c,
         else:
             _do_ai_turn(game, new_board, -player, nnet, mcts_args, n, is_move)
 
-        st.rerun()
+        st.rerun(scope="fragment")
 
     elif is_move:
         my_pieces = get_my_pieces(board, n)
@@ -387,7 +389,7 @@ def _handle_board_click(game, board, n, player, r, c,
             # 取消选择
             st.session_state.selected_piece = None
             st.session_state.board_version = st.session_state.get('board_version', 0) + 1
-            st.rerun()
+            st.rerun(scope="fragment")
 
         elif valid_dests and (r, c) in valid_dests:
             # === Move 模式: 执行移动 ===
@@ -409,13 +411,13 @@ def _handle_board_click(game, board, n, player, r, c,
             else:
                 _do_ai_turn(game, new_board, -player, nnet, mcts_args, n, is_move)
 
-            st.rerun()
+            st.rerun(scope="fragment")
 
         elif (r, c) in my_pieces:
             # 选择棋子
             st.session_state.selected_piece = (r, c)
             st.session_state.board_version = st.session_state.get('board_version', 0) + 1
-            st.rerun()
+            st.rerun(scope="fragment")
 
 
 def _do_ai_turn(game, board, player, nnet, mcts_args, n, is_move):

@@ -87,14 +87,14 @@ class Coach:
             dict: 训练指标 (metrics)
         """
         for i in range(1, self.args.numIters + 1):
-            print(f'------ 迭代 Iteration {i}/{self.args.numIters} ------')
+            print(f'------ Iteration {i}/{self.args.numIters} ------')
             iterationTrainExamples = deque([], maxlen=self.args.maxlenOfQueue)
 
             # 1. 自我对弈 (Self-Play)
-            print(f"自我对弈 {self.args.numEps} 局中...")
+            print(f"Self-play {self.args.numEps} episodes...")
             for eps in range(self.args.numEps):
                 iterationTrainExamples += self.executeEpisode()
-                print(f"\r  进度: {eps+1}/{self.args.numEps}", end="")
+                print(f"\r  Progress: {eps+1}/{self.args.numEps}", end="")
             print("")
 
             # 保存历史数据
@@ -109,7 +109,7 @@ class Coach:
             shuffle(trainExamples)
 
             # 3. 训练神经网络 (收集 loss)
-            print(f"开始训练 (数据量: {len(trainExamples)})...")
+            print(f"Training (data size: {len(trainExamples)})...")
             loss_data = self.nnet.train(trainExamples)
 
             # 记录指标
@@ -119,13 +119,16 @@ class Coach:
                 self.metrics['total_loss'].append(np.mean(loss_data['total_loss']))
             self.metrics['data_size'].append(len(trainExamples))
 
-            avg_loss = self.metrics['total_loss'][-1] if self.metrics['total_loss'] else 0
-            print(f"  Loss: {avg_loss:.4f} "
-                  f"(pi: {self.metrics['policy_loss'][-1]:.4f}, "
-                  f"v: {self.metrics['value_loss'][-1]:.4f})")
+            if self.metrics['total_loss']:
+                avg_loss = self.metrics['total_loss'][-1]
+                print(f"  Loss: {avg_loss:.4f} "
+                      f"(pi: {self.metrics['policy_loss'][-1]:.4f}, "
+                      f"v: {self.metrics['value_loss'][-1]:.4f})")
+            else:
+                print(f"  Loss: N/A (insufficient data)")
 
             # 4. 保存模型
-            print("保存模型...")
+            print("Saving model...")
             self.nnet.save_checkpoint(folder=self.args.checkpoint, filename=f'checkpoint_{i}.pth.tar')
             self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='best.pth.tar')
 
@@ -135,7 +138,7 @@ class Coach:
         """将训练指标保存为 JSON"""
         with open(filepath, 'w') as f:
             json.dump(self.metrics, f, indent=2)
-        print(f"指标已保存: {filepath}")
+        print(f"Metrics saved: {filepath}")
 
     @staticmethod
     def load_metrics(filepath):
@@ -189,6 +192,13 @@ class MultiTaskCoach:
         curPlayer = 1
         episodeStep = 0
 
+        # Switch nnet to target game context for correct predict routing
+        orig_id = self.nnet.game_id
+        orig_gx, orig_gy = self.nnet.game_x, self.nnet.game_y
+        self.nnet.game_id = game_id
+        gx, gy = game.get_board_size()
+        self.nnet.game_x, self.nnet.game_y = gx, gy
+
         mcts = MCTS(game, self.nnet, self.args)
 
         while True:
@@ -206,6 +216,9 @@ class MultiTaskCoach:
 
             r = game.get_game_ended(board, 1)
             if r != 0:
+                # Restore original nnet context
+                self.nnet.game_id = orig_id
+                self.nnet.game_x, self.nnet.game_y = orig_gx, orig_gy
                 return [(x[0], x[2], r * x[1], x[4]) for x in trainExamples]
 
     def learn(self):
@@ -273,10 +286,13 @@ class MultiTaskCoach:
                     np.mean(loss_data['total_loss']))
             self.metrics['data_size'].append(len(trainExamples))
 
-            avg_loss = self.metrics['total_loss'][-1] if self.metrics['total_loss'] else 0
-            print(f"  Loss: {avg_loss:.4f} "
-                  f"(pi: {self.metrics['policy_loss'][-1]:.4f}, "
-                  f"v: {self.metrics['value_loss'][-1]:.4f})")
+            if self.metrics['total_loss']:
+                avg_loss = self.metrics['total_loss'][-1]
+                print(f"  Loss: {avg_loss:.4f} "
+                      f"(pi: {self.metrics['policy_loss'][-1]:.4f}, "
+                      f"v: {self.metrics['value_loss'][-1]:.4f})")
+            else:
+                print(f"  Loss: N/A (insufficient data)")
 
             # 5. 保存候选模型
             self.nnet.save_checkpoint(

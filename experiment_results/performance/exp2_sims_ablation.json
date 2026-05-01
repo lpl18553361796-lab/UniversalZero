@@ -1,0 +1,104 @@
+{
+  "hex_json": {
+    "10": {
+      "win_rate": 0.35,
+      "wins": 7,
+      "losses": 13,
+      "draws": 0,
+      "elo": 692.5,
+      "time_s": 4.6
+    },
+    "25": {
+      "win_rate": 0.15,
+      "wins": 3,
+      "losses": 17,
+      "draws": 0,
+      "elo": 498.7,
+      "time_s": 11.6
+    },
+    "50": {
+      "win_rate": 0.15,
+      "wins": 3,
+      "losses": 17,
+      "draws": 0,
+      "elo": 498.7,
+      "time_s": 24.0
+    },
+    "100": {
+      "win_rate": 0.25,
+      "wins": 5,
+      "losses": 15,
+      "draws": 0,
+      "elo": 609.2,
+      "time_s": 51.0
+    }
+  },
+  "tictactoe": {
+    "10": {
+      "win_rate": 0.45,
+      "wins": 9,
+      "losses": 11,
+      "draws": 0,
+      "elo": 765.1,
+      "time_s": 0.5
+    },
+    "25": {
+      "win_rate": 0.4,
+      "wins": 8,
+      "losses": 12,
+      "draws": 0,
+      "elo": 729.6,
+      "time_s": 0.9
+    },
+    "50": {
+      "win_rate": 0.3,
+      "wins": 6,
+      "losses": 14,
+      "draws": 0,
+      "elo": 652.8,
+      "time_s": 1.2
+    },
+    "100": {
+      "win_rate": 0.3,
+      "wins": 6,
+      "losses": 14,
+      "draws": 0,
+      "elo": 652.8,
+      "time_s": 1.9
+    }
+  },
+  "breakthrough_json": {
+    "10": {
+      "win_rate": 0.0,
+      "wins": 0,
+      "losses": 20,
+      "draws": 0,
+      "elo": -399.8,
+      "time_s": 9.8
+    },
+    "25": {
+      "win_rate": 0.0,
+      "wins": 0,
+      "losses": 20,
+      "draws": 0,
+      "elo": -399.8,
+      "time_s": 25.6
+    },
+    "50": {
+      "win_rate": 0.0,
+      "wins": 0,
+      "losses": 20,
+      "draws": 0,
+      "elo": -399.8,
+      "time_s": 49.8
+    },
+    "100": {
+      "win_rate": 0.0,
+      "wins": 0,
+      "losses": 20,
+      "draws": 0,
+      "elo": -399.8,
+      "time_s": 102.7
+    }
+  }
+}

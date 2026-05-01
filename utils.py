@@ -4,4 +4,7 @@ class dotdict(dict):
     例如：args.num 而不是 args['num']
     """
     def __getattr__(self, name):
-        return self[name]
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
