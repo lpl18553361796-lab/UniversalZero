@@ -1,5 +1,5 @@
 {
-  "id": "hex_json",
+  "id": "hex",
   "name": "Hex",
   "board": {
     "geometry": "hexagonal",

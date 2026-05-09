@@ -124,6 +124,11 @@ class Coach:
                 print(f"  Loss: {avg_loss:.4f} "
                       f"(pi: {self.metrics['policy_loss'][-1]:.4f}, "
                       f"v: {self.metrics['value_loss'][-1]:.4f})")
+                
+                # 追加保存 loss 到 loss.txt
+                loss_path = os.path.join(self.args.checkpoint, "loss.txt")
+                with open(loss_path, "a") as f:
+                    f.write(f"{self.metrics['policy_loss'][-1]:.6f}\n")
             else:
                 print(f"  Loss: N/A (insufficient data)")
 
@@ -291,6 +296,11 @@ class MultiTaskCoach:
                 print(f"  Loss: {avg_loss:.4f} "
                       f"(pi: {self.metrics['policy_loss'][-1]:.4f}, "
                       f"v: {self.metrics['value_loss'][-1]:.4f})")
+
+                # 追加保存 loss 到 loss.txt
+                loss_path = os.path.join(self.args.checkpoint, "loss.txt")
+                with open(loss_path, "a") as f:
+                    f.write(f"{self.metrics['policy_loss'][-1]:.6f}\n")
             else:
                 print(f"  Loss: N/A (insufficient data)")
 

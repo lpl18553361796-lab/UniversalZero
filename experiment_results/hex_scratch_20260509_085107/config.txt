@@ -1,0 +1,1 @@
+{'numIters': 50, 'numEps': 25, 'tempThreshold': 15, 'updateThreshold': 0.55, 'maxlenOfQueue': 200000, 'num_mcts_sims': 100, 'arenaCompare': 20, 'cpuct': 1, 'checkpoint': './experiment_results/', 'load_model': False}

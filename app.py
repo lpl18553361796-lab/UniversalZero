@@ -32,6 +32,50 @@ from mcts import MCTS
 #  工具类
 # ================================================================
 
+def inject_custom_css():
+    st.markdown("""
+    <style>
+    /* 深色科技风基础背景 */
+    .stApp {
+        background-color: #0e1117;
+        color: #c9d1d9;
+        font-family: 'Inter', sans-serif;
+    }
+    /* 卡片高亮与毛玻璃效果 */
+    .css-1r6slb0, .css-1y4p8pa {
+        background: rgba(22, 27, 34, 0.6);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 1.5rem;
+    }
+    /* 标题微动效与渐变 */
+    h1, h2, h3 {
+        background: -webkit-linear-gradient(45deg, #58a6ff, #8b949e);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: fadeIn 1s ease-in;
+    }
+    /* 按钮拟态与呼吸灯效果 */
+    .stButton>button {
+        background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(46, 160, 67, 0.3);
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(46, 160, 67, 0.5);
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 class MCTSArgs:
     def __init__(self, num_mcts_sims=25, cpuct=1.0, max_depth=50):
         self.num_mcts_sims = num_mcts_sims
@@ -43,10 +87,14 @@ class MCTSArgs:
 
 
 @st.cache_resource
-def load_nnet(game_id):
+def load_nnet(game_id, model_path=None):
     from nnet.nnet import NNetWrapper
     game = get_game_by_id(game_id)
-    return NNetWrapper(game, game_id)
+    nnet = NNetWrapper(game, game_id)
+    if model_path and os.path.exists(model_path):
+        folder, filename = os.path.split(model_path)
+        nnet.load_checkpoint(folder=folder, filename=filename)
+    return nnet
 
 
 # ================================================================
@@ -519,14 +567,14 @@ def init_session_state():
         'player': 1, 'game_over': False, 'game_message': '',
         'last_move': None, 'move_history': [], 'nnet': None,
         'selected_piece': None, 'board_version': 0,
-        'llm_generated_json': None,
+        'llm_generated_json': None, 'model_path': None,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = val
 
 
-def start_new_game(game_id):
+def start_new_game(game_id, model_path=None):
     game = get_game_by_id(game_id)
     st.session_state.game_id = game_id
     st.session_state.game = game
@@ -538,7 +586,9 @@ def start_new_game(game_id):
     st.session_state.move_history = []
     st.session_state.selected_piece = None
     st.session_state.board_version = 0
-    st.session_state.nnet = load_nnet(game_id)
+    st.session_state.model_path = model_path
+    load_nnet.clear()
+    st.session_state.nnet = load_nnet(game_id, model_path)
 
 
 # ================================================================
@@ -547,6 +597,7 @@ def start_new_game(game_id):
 
 def main():
     st.set_page_config(page_title="UniversalZero", page_icon="♟", layout="wide")
+    inject_custom_css()
     init_session_state()
 
     # === 侧边栏 ===
@@ -555,54 +606,63 @@ def main():
         st.caption("AlphaZero Multi-Task Engine")
 
         st.subheader("Game Selection")
-        json_games = {k: v for k, v in GAME_REGISTRY.items()
-                      if isinstance(v, UniversalGame)}
-        all_games = list(GAME_REGISTRY.keys())
+        # 只显示实验用的两个核心游戏
+        all_games = [g for g in ['hex', 'tictactoe'] if g in GAME_REGISTRY]
         selected = st.selectbox("Choose a game", options=all_games,
-                                index=0 if all_games else None,
-                                format_func=lambda x: f"{x} ({'JSON' if x in json_games else 'class'})")
+                                index=0 if all_games else None)
+
+        st.subheader("Model")
+        # 只展示每个实验文件夹的 best.pth.tar，命名直观
+        available_models = {"\u2b1c Untrained (Random)": None}
+        exp_dir = os.path.join(_project_root, 'experiment_results')
+        if os.path.exists(exp_dir) and selected:
+            for d in sorted(os.listdir(exp_dir), reverse=True):
+                if selected in d and os.path.isdir(os.path.join(exp_dir, d)):
+                    best_path = os.path.join(exp_dir, d, 'best.pth.tar')
+                    if os.path.exists(best_path):
+                        tag = d.replace(f"{selected}_", "").replace("_", " ")
+                        available_models[f"\U0001f3c6 {tag}"] = best_path
+
+        selected_label = st.selectbox("Load Model", options=list(available_models.keys()), index=0)
+
         if st.button("New Game", type="primary"):
             if selected:
-                start_new_game(selected)
+                model_path = available_models[selected_label]
+                start_new_game(selected, model_path)
                 st.rerun()
 
         st.divider()
 
-        st.subheader("MCTS Settings")
-        num_sims = st.slider("Simulations", 5, 100, 25, step=5)
-        cpuct = st.slider("Exploration (cpuct)", 0.5, 3.0, 1.0, step=0.1)
-        mcts_args = MCTSArgs(num_mcts_sims=num_sims, cpuct=cpuct)
-
-        st.divider()
-
-        if st.session_state.game is not None:
-            training_panel(st.session_state.game, st.session_state.game_id,
-                           st.session_state.nnet)
-            st.divider()
-
-        with st.expander("LLM Rule Generator", expanded=False):
+        # LLM 规则生成器 (LM Studio 后端)
+        with st.expander("\U0001f916 LLM Rule Generator", expanded=False):
             try:
-                from rules_translator import check_service, translate_to_json, save_rule
+                from rules_translator import check_service, translate_to_json, save_rule, BACKEND
                 _llm_available = True
             except ImportError:
                 _llm_available = False
-                st.warning("rules_translator not available (missing requests?)")
+                st.warning("rules_translator not available")
 
             if _llm_available:
-                ollama_ok = check_service()
-                if ollama_ok:
-                    st.success("Ollama: Online")
+                backend_label = "LM Studio" if BACKEND == "lmstudio" else "Ollama"
+                # 允许用户确认连接地址
+                from rules_translator import LMSTUDIO_BASE_URL, OLLAMA_BASE_URL
+                default_url = LMSTUDIO_BASE_URL if BACKEND == "lmstudio" else OLLAMA_BASE_URL
+                svc_url = st.text_input("Server URL", value=default_url, key="llm_url")
+                service_ok = check_service()
+                if service_ok:
+                    st.success(f"{backend_label}: \U0001f7e2 Online")
                 else:
-                    st.error("Ollama: Offline — start with `ollama serve`")
+                    st.error(f"{backend_label}: \U0001f534 Offline ({svc_url})")
+                    st.caption("\u8bf7\u786e\u8ba4 LM Studio \u5df2\u542f\u52a8 Local Server\uff0c\u9ed8\u8ba4\u7aef\u53e3 1234")
 
                 nl_input = st.text_area(
                     "Describe a new game",
                     placeholder='e.g. "5x5, place pieces, 4 in a row wins"',
                     height=80)
 
-                if st.button("Generate Rules", disabled=not ollama_ok):
+                if st.button("Generate Rules", disabled=not service_ok):
                     if nl_input.strip():
-                        with st.spinner("Translating with gemma3:4b..."):
+                        with st.spinner(f"Translating with {backend_label}..."):
                             try:
                                 rule = translate_to_json(nl_input.strip(), verbose=False)
                                 filepath = save_rule(rule, verbose=False)
@@ -612,49 +672,90 @@ def main():
                                     os.path.basename(filepath))[0])
                                 if new_id not in GAME_REGISTRY:
                                     register_game(new_id, new_game)
-                                st.session_state.llm_generated_json = rule
-                                st.success(f"Generated: {new_id}")
+                                st.success(f"\u2705 Generated: {new_id}")
                                 start_new_game(new_id)
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Failed: {e}")
 
+        # MCTS 参数硬编码，保持 UI 极简
+        mcts_args = MCTSArgs(num_mcts_sims=50, cpuct=1.0)
+
     # === 主界面 ===
     if st.session_state.game is None:
-        st.markdown("## Welcome to UniversalZero")
-        st.markdown("Select a game from the sidebar and click **New Game** to begin.")
+        st.markdown("## Willkommen bei UniversalZero")
+        st.markdown("Wählen Sie im linken Menü ein Spiel aus und klicken Sie auf **New Game**, um zu starten.")
         st.markdown("---")
-        st.markdown("### Registered Games")
-        for gid, entry in GAME_REGISTRY.items():
+
+        # --- Funktionsübersicht (Deutsch) ---
+        st.markdown("### 📖 Funktionsübersicht")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("""
+**🎮 KI-Kampfarena**  
+Spielen Sie gegen das trainierte AlphaZero-Modell.  
+Wählen Sie ein Spiel und ein Modell aus dem Seitenmenü, dann klicken Sie auf *New Game*.
+
+**🤖 LLM-Regelgenerator**  
+Beschreiben Sie ein neues Spiel in natürlicher Sprache.  
+Das System übersetzt die Beschreibung automatisch in ein JSON-Regelformat und erstellt ein spielbares Spiel.
+""")
+        with col2:
+            st.markdown("""
+**📊 Erfahrungstransfer-Analyse**  
+Vergleicht die Konvergenzkurven zweier Trainingsansätze:  
+- *Scratch*: Modell von Grund auf trainiert  
+- *Transfer*: Vortrainiertes Modell auf neues Spiel übertragen  
+Misst den Jumpstart- und Speedup-Effekt des Wissenstransfers.
+
+**🏋️ Training**  
+Trainieren Sie ein neues Modell direkt im Browser  
+mit Self-Play und Monte-Carlo-Tree-Search (MCTS).
+""")
+
+        st.markdown("---")
+
+        # --- Verfügbare Spiele ---
+        st.markdown("### 🎲 Verfügbare Spiele")
+        core_games = ['hex', 'tictactoe']
+        for gid in core_games:
+            entry = GAME_REGISTRY.get(gid)
+            if entry is None:
+                continue
             if isinstance(entry, UniversalGame):
                 st.markdown(f"- **{gid}**: {entry.name} "
-                            f"({entry.n}x{entry.n}, {entry.action_mode}, "
-                            f"{entry.end_condition.get('type', '?')})")
+                            f"({entry.n}×{entry.n}, Modus: `{entry.action_mode}`, "
+                            f"Siegbedingung: `{entry.end_condition.get('type', '?')}`)")
             elif isinstance(entry, type):
                 inst = entry()
                 bx, by = inst.get_board_size()
-                st.markdown(f"- **{gid}**: {bx}x{by} (class)")
+                st.markdown(f"- **{gid}**: {bx}×{by}")
+
         return
 
     game = st.session_state.game
     game_name = game.name if hasattr(game, 'name') else st.session_state.game_id
     st.markdown(f"### {game_name}")
 
+    if st.session_state.get('model_path'):
+        st.success(f"🤖 Aktives Modell: `{st.session_state.model_path}`")
+    else:
+        st.warning("🤖 Aktives Modell: Untrainiert (Zufallsgewichte)")
+
     # 棋盘区域 (fragment — 局部刷新)
     board_section(game, mcts_args)
 
     # 游戏信息
-    with st.expander("Game Info", expanded=False):
+    with st.expander("Spielinfo", expanded=False):
         n = game.n if hasattr(game, 'n') else game.get_board_size()[0]
-        items = [f"**Game ID:** {st.session_state.game_id}", f"**Board:** {n}x{n}"]
+        items = [f"**Game ID:** {st.session_state.game_id}", f"**Brettgröße:** {n}×{n}"]
         if hasattr(game, 'action_mode'):
-            items.append(f"**Mode:** {game.action_mode}")
+            items.append(f"**Modus:** {game.action_mode}")
         if hasattr(game, 'end_condition'):
-            items.append(f"**Win:** {game.end_condition.get('type', '?')}")
+            items.append(f"**Siegbedingung:** {game.end_condition.get('type', '?')}")
         if hasattr(game, 'geometry'):
-            items.append(f"**Geometry:** {game.geometry}")
+            items.append(f"**Geometrie:** {game.geometry}")
         st.markdown("  \n".join(items))
-
 
 if __name__ == "__main__":
     main()

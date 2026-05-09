@@ -29,9 +29,18 @@ import requests
 #  常量
 # ================================================================
 
+# Ollama 后端
 OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_MODEL = "gemma3:4b"
+
+# LM Studio 后端（OpenAI 兼容接口）
+LMSTUDIO_BASE_URL = "http://localhost:1234"
+LMSTUDIO_MODEL = "gemma-3-4b-instruct"  # 会被自动覆盖为 LM Studio 当前加载的模型
+
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
+
+# 后端选择: 'ollama' 或 'lmstudio'
+BACKEND = "lmstudio"
 
 # ================================================================
 #  System Prompt — 强约束 Few-shot 模板
@@ -112,16 +121,20 @@ Output:
 """
 
 # ================================================================
-#  Ollama API 客户端
+#  LLM 后端客户端（支持 Ollama + LM Studio）
 # ================================================================
 
 class OllamaError(RuntimeError):
     pass
 
 
-def check_service(base_url: str = OLLAMA_BASE_URL, timeout_s: float = 5.0) -> bool:
-    """检查 Ollama 服务是否可达"""
-    url = f"{base_url.rstrip('/')}/api/tags"
+def check_service(backend: str = BACKEND, timeout_s: float = 5.0) -> bool:
+    """检查 LLM 服务是否可达（自动识别后端）"""
+    if backend == "lmstudio":
+        # LM Studio 使用 OpenAI 兼容的 /v1/models 接口
+        url = f"{LMSTUDIO_BASE_URL.rstrip('/')}/v1/models"
+    else:
+        url = f"{OLLAMA_BASE_URL.rstrip('/')}/api/tags"
     try:
         r = requests.get(url, timeout=timeout_s)
         return r.status_code == 200
@@ -132,33 +145,61 @@ def check_service(base_url: str = OLLAMA_BASE_URL, timeout_s: float = 5.0) -> bo
 def chat_once(
     user_prompt: str,
     system_prompt: str = SYSTEM_PROMPT,
-    model: str = OLLAMA_MODEL,
-    base_url: str = OLLAMA_BASE_URL,
+    model: str = None,
+    base_url: str = None,
     timeout_s: float = 120.0,
     temperature: float = 0.1,
+    backend: str = BACKEND,
 ) -> str:
-    """单轮非流式对话，返回模型输出文本"""
-    url = f"{base_url.rstrip('/')}/api/chat"
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
-    payload = {
-        "model": model,
-        "stream": False,
-        "messages": messages,
-        "options": {"temperature": temperature, "num_ctx": 4096},
-    }
-    try:
-        r = requests.post(url, json=payload, timeout=timeout_s)
-    except requests.RequestException as e:
-        raise OllamaError(f"POST /api/chat failed: {e}") from e
+    """单轮非流式对话，自动根据 backend 选择 API 格式"""
+    if backend == "lmstudio":
+        # OpenAI 兼容接口
+        _base = (base_url or LMSTUDIO_BASE_URL).rstrip('/')
+        _model = model or LMSTUDIO_MODEL
+        url = f"{_base}/v1/chat/completions"
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        payload = {
+            "model": _model,
+            "stream": False,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": 2048,
+        }
+        try:
+            r = requests.post(url, json=payload, timeout=timeout_s)
+        except requests.RequestException as e:
+            raise OllamaError(f"POST /v1/chat/completions failed: {e}") from e
+        if r.status_code != 200:
+            raise OllamaError(f"/v1/chat/completions returned HTTP {r.status_code}: {r.text}")
+        data = r.json()
+        content = (data.get("choices") or [{}])[0].get("message", {}).get("content")
+    else:
+        # Ollama 原生接口
+        _base = (base_url or OLLAMA_BASE_URL).rstrip('/')
+        _model = model or OLLAMA_MODEL
+        url = f"{_base}/api/chat"
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        payload = {
+            "model": _model,
+            "stream": False,
+            "messages": messages,
+            "options": {"temperature": temperature, "num_ctx": 4096},
+        }
+        try:
+            r = requests.post(url, json=payload, timeout=timeout_s)
+        except requests.RequestException as e:
+            raise OllamaError(f"POST /api/chat failed: {e}") from e
+        if r.status_code != 200:
+            raise OllamaError(f"/api/chat returned HTTP {r.status_code}: {r.text}")
+        data = r.json()
+        content = (data.get("message") or {}).get("content")
 
-    if r.status_code != 200:
-        raise OllamaError(f"/api/chat returned HTTP {r.status_code}: {r.text}")
-
-    data = r.json()
-    content = (data.get("message") or {}).get("content")
     if not isinstance(content, str):
         raise OllamaError(f"Unexpected response shape: {json.dumps(data, indent=2)}")
     return content
