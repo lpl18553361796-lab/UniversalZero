@@ -1,0 +1,21 @@
+Copy these two lines into the Raspberry Pi terminal:
+
+chmod +x /home/lpl/UniversalZero-main/UniversalZero-main/raspberry_pi/lazy_install_all.sh
+bash /home/lpl/UniversalZero-main/UniversalZero-main/raspberry_pi/lazy_install_all.sh
+
+
+Manual install commands:
+
+cd /home/lpl/UniversalZero-main/UniversalZero-main
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip python3-torch
+bash raspberry_pi/install_pi_launcher.sh
+
+
+After install:
+
+Double-click UniversalZero on the desktop.
+
+Or run from terminal:
+
+bash /home/lpl/UniversalZero-main/UniversalZero-main/raspberry_pi/run_universalzero_pi.sh

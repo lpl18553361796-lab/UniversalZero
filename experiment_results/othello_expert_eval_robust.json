@@ -1,0 +1,46 @@
+{
+  "model_name": "othello_expert_8x8.pth.tar",
+  "expert_mcts_sims": 50,
+  "evaluation_games_per_test": 100,
+  "seed": 20260607,
+  "fresh_mcts_per_game": true,
+  "timestamp": "2026-06-07 18:58:48",
+  "benchmarks": {
+    "vs_random": {
+      "wins": 100,
+      "losses": 0,
+      "draws": 0,
+      "win_rate": 1.0,
+      "win_rate_ci95": [
+        0.963,
+        1.0
+      ],
+      "elo_rating": 1999.8,
+      "duration_seconds": 276.7
+    },
+    "vs_pure_mcts_50": {
+      "wins": 98,
+      "losses": 2,
+      "draws": 0,
+      "win_rate": 0.98,
+      "win_rate_ci95": [
+        0.93,
+        0.9945
+      ],
+      "elo_rating": 1676.1,
+      "duration_seconds": 390.1
+    },
+    "vs_pure_mcts_100": {
+      "wins": 97,
+      "losses": 3,
+      "draws": 0,
+      "win_rate": 0.97,
+      "win_rate_ci95": [
+        0.9155,
+        0.9897
+      ],
+      "elo_rating": 1703.9,
+      "duration_seconds": 444.5
+    }
+  }
+}

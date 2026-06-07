@@ -2,24 +2,44 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Virtual Environments
+*.so
+.venv/
 venv/
-venv311/
-env/
-.env
+ENV/
 
-# Temporary Data
-temp/
-temp_strong/
-temp_transfer/
-temp_hex/
-*.pth.tar
-*.png
+# Experiment artifacts: keep formal paper outputs only.
+experiment_results/*
+!experiment_results/.gitkeep
+!experiment_results/othello_expert_eval_robust.json
+!experiment_results/hex_transfer_benefit_fixed_quick_eval.json
+!experiment_results/paper_figures/
+experiment_results/paper_figures/*
+!experiment_results/paper_figures/*.png
+!experiment_results/paper_figures/*.pdf
+!experiment_results/paper_figures/*.csv
+!experiment_results/paper_figures/*.md
+!experiment_results/hex_transfer_convergence/
+experiment_results/hex_transfer_convergence/*
+!experiment_results/hex_transfer_convergence/*.csv
+!experiment_results/hex_transfer_convergence/*.json
+!experiment_results/hex_transfer_convergence/*.png
 
-# IDEs
+# Large generated models.
+final_models/*
+!final_models/.gitkeep
+
+# Temporary training data and checkpoints.
+temp_data/
+checkpoint/
+checkpoints/
+**/temp_data/
+**/checkpoint/
+**/checkpoints/
+
+# IDE
 .vscode/
 .idea/
 
-# Windows
+# OS
+.DS_Store
 Thumbs.db

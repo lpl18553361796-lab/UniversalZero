@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-06-04 15:22:59",
+  "hostname": "lpl",
+  "cpu_percent": 0.00,
+  "memory": {
+    "percent": 46.93,
+    "used_mb": 941.81,
+    "available_mb": 1064.94,
+    "total_mb": 2006.75
+  },
+  "temperature_c": "51.6",
+  "csv_file": "/home/lpl/UniversalZero-main/UniversalZero-main/pi_tools/logs/system_usage.csv"
+}

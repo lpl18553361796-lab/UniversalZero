@@ -1,0 +1,4 @@
+benchmark,wins,losses,draws,win_rate_percent,elo_rating,duration_seconds
+Random,100,0,0,100.0,1999.8,276.7
+Pure MCTS-50,98,2,0,98.0,1676.1,390.1
+Pure MCTS-100,97,3,0,97.0,1703.9,444.5

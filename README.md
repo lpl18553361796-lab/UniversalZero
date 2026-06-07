@@ -1,75 +1,36 @@
-﻿# UniversalZero: General-Purpose AlphaZero Engine
+# UniversalZero: 多任务棋类迁移学习平台
 
-UniversalZero is a modular, high-performance implementation of the AlphaZero algorithm, designed to learn multiple board games from scratch without human knowledge. It features a standardized neural network architecture and a dynamic game registry system.
+UniversalZero 是一个基于 AlphaZero 算法的通用强化学习框架，旨在探索不同复杂度的棋类游戏（Hex, Othello, TicTacToe）之间的特征迁移与知识共享。
 
-## 🚀 Key Features
+## 🌟 核心特性
+- **共享主干网络 (Shared Backbone)**: 使用统一的 ResNet 提取跨游戏的通用空间特征。
+- **多任务路由 (MTL Routing)**: 针对不同游戏动态挂载独立的策略头。
+- **知识迁移实验**: 支持从简单任务（如 TicTacToe/Othello）向复杂任务（如 Hex）迁移权重。
+- **交互式 UI**: 基于 Streamlit 的可视化对局与模型性能评估工具。
 
-### 🧠 Universal Brain (Standardized ResNet)
-- **9x9 Input Normalization**: The neural network (ResNet) accepts a standardized 9x9 input, allowing it to adapt to any board game fitting within these dimensions (e.g., 8x8 Breakthrough, 7x7 Hex) via zero-padding.
-- **Backbone Transfer**: Supports "Brain Surgery" (`transfer.py`), allowing a new game to inherit the geometric intuition (backbone weights) from a previously trained model.
+## 🚀 快速开始
 
-### 🛡️ Robust MCTS Engine
-- **Safety**: Implemented recursion depth limits (`max_depth=100`) to prevent stack overflows during deep searches.
-- **Temperature Control**: Adjustable exploration/exploitation balance via temperature parameters.
-
-### ⚡ Optimization (Hex Union-Find)
-- **O(N²) -> O(1) Speedup**: Replaced DFS-based connectivity checks in Hex with an incremental **Union-Find (Disjoint Set Union)** data structure.
-- **Virtual Nodes**: Uses virtual Top/Bottom/Left/Right nodes for efficient edge connection detection.
-
-### 🧩 Dynamic Game Registry
-- **Hot-Swapping**: Games are registered in a central `GAME_REGISTRY`.
-- **String IDs**: Switch between 'breakthrough' and 'hex' dynamically at runtime without changing the core engine.
-
-## 🎮 Supported Games
-
-1.  **Breakthrough (8x8)**: A racing game of strategy and blocking.
-    *   *Complexity*: Moderate
-    *   *Avg Game Length*: ~40-60 moves
-2.  **Hex (7x7)**: A connection game played on a hexagonal grid.
-    *   *Complexity*: High (Connection strategy)
-    *   *Optimization*: Union-Find enabled
-
-## 🛠️ Quick Start
-
-### Prerequisites
+### 1. 安装依赖
 ```bash
-pip install numpy torch
-# Optional for GUI
-pip install pygame matplotlib
+pip install -r requirements.txt
 ```
 
-### Training
-Train the AI from scratch on Breakthrough:
+### 2. 运行交互式 UI
 ```bash
-python main.py
+streamlit run ui/app.py
 ```
 
-Train on Hex:
-```bash
-python main_hex.py
-```
+### 3. 开启训练
+- **从零训练**: `python scripts/main.py --game hex --iters 60`
+- **迁移学习**: `python scripts/transfer.py --source final_models/othello_expert.pth.tar --target_game hex --iters 60 --freeze`
 
-### Human vs AI
-Play against your trained model in the terminal:
-```bash
-python play.py
-```
-*(Follow the on-screen prompts. For Hex, inputs are `row col`)*
+## 📊 实验结论 (2024.05)
+- **迁移加速**: 在 Hex (7x7/11x11) 任务中，加载 Othello 专家权重的模型在前期探索阶段比从零训练快约 30%。
+- **尺度敏感性**: 发现 TicTacToe (3x3) 由于在 9x9 输入空间中过于稀疏，其特征对于大型棋盘的迁移贡献度有限。
 
-### Visualization (GUI)
-Launch the graphical interface (requires pygame):
-```bash
-python gui.py breakthrough
-# or
-python gui.py hex
-```
-
-## 📂 Project Structure
-- `mcts.py`: Monte Carlo Tree Search core.
-- `nnet/`: Neural Network implementation (PyTorch).
-- `coach.py`: Self-play and training loop orchestrator.
-- `game.py`: Abstract base class and Registry.
-- `breakthrough.py` / `hex_game.py`: Game rule implementations.
-- `transfer.py`: Weight transfer utility.
-
----
+## 📂 项目结构
+- `core/`: MCTS 引擎与训练调度器
+- `games/`: 各棋类游戏逻辑实现
+- `nnet/`: 通用神经网络架构与迁移管理器
+- `ui/`: Streamlit 交互界面
+- `scripts/`: 训练与实验脚本

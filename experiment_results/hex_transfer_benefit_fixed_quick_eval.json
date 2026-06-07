@@ -1,0 +1,30 @@
+{
+  "game": "hex",
+  "transfer_model": "experiment_results\\hex_transfer_fixed_quick\\hex_transfer_final.pth.tar",
+  "scratch_model": "experiment_results\\hex_scratch_fixed_quick\\hex_scratch_final.pth.tar",
+  "games_per_benchmark": 100,
+  "mcts_sims": 50,
+  "timestamp": "2026-06-02 20:12:24",
+  "duration_seconds": 896.1,
+  "transfer_vs_random": {
+    "wins": 90,
+    "losses": 10,
+    "draws": 0,
+    "win_rate": 0.9,
+    "elo_rating": 1181.7
+  },
+  "scratch_vs_random": {
+    "wins": 88,
+    "losses": 12,
+    "draws": 0,
+    "win_rate": 0.88,
+    "elo_rating": 1146.1
+  },
+  "transfer_vs_scratch": {
+    "wins": 78,
+    "losses": 22,
+    "draws": 0,
+    "win_rate": 0.78,
+    "elo_rating": 1219.9
+  }
+}
