@@ -477,13 +477,20 @@ def _do_ai_turn(game, board, player, nnet, mcts_args, n, is_move):
 #  训练面板
 # ================================================================
 
-def training_panel(game, game_id, nnet):
-    st.subheader("Training")
-    train_iters = st.number_input("Iterations", 1, 100, 5, key="train_iters")
-    train_eps = st.number_input("Episodes / iter", 1, 20, 3, key="train_eps")
-    train_sims = st.number_input("MCTS sims", 5, 50, 10, key="train_sims")
+def training_panel(game_id, model_path=None):
+    st.caption("Small demo-friendly AlphaZero training job.")
+    train_iters = st.number_input("Iterations", 1, 20, 1, key="train_iters")
+    train_eps = st.number_input("Episodes / iter", 1, 20, 2, key="train_eps")
+    train_sims = st.number_input("MCTS sims", 1, 50, 5, key="train_sims")
 
-    if st.button("Start Training", width="stretch", type="primary"):
+    if model_path:
+        st.caption(f"Continue from: `{os.path.basename(model_path)}`")
+    else:
+        st.caption("Initial model: random / untrained")
+
+    if st.button("Start Training", use_container_width=True, type="primary"):
+        game = get_game_by_id(game_id)
+        nnet = load_nnet(game_id, model_path)
         _run_training(game, game_id, nnet, train_iters, train_eps, train_sims)
 
 
@@ -491,7 +498,7 @@ def _run_training(game, game_id, nnet, num_iters, num_eps, num_sims):
     from coach import Coach
     from utils import dotdict
 
-    checkpoint_dir = os.path.join(_project_root, 'checkpoints', game_id)
+    checkpoint_dir = os.path.join(_project_root, 'checkpoints', f'web_{game_id}')
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     args = dotdict({
@@ -502,6 +509,7 @@ def _run_training(game, game_id, nnet, num_iters, num_eps, num_sims):
         'cpuct': 1.0,
         'checkpoint': checkpoint_dir,
         'maxlenOfQueue': 10000,
+        'num_workers': 1,
     })
 
     coach = Coach(game, nnet, args)
@@ -515,23 +523,34 @@ def _run_training(game, game_id, nnet, num_iters, num_eps, num_sims):
         coach.args = dotdict(dict(args))
         coach.args.checkpoint = checkpoint_dir
         metrics = coach.learn()
+        rows = metrics.get('iterations', []) if isinstance(metrics, dict) else []
 
-        if metrics['policy_loss']:
-            pi_l = metrics['policy_loss'][-1]
-            v_l = metrics['value_loss'][-1]
+        if rows:
+            row = rows[-1]
+            pi_l = row.get('policy_loss')
+            v_l = row.get('value_loss')
             chart_data['iteration'].append(i)
             chart_data['policy_loss'].append(pi_l)
             chart_data['value_loss'].append(v_l)
-            loss_log.text(f"Iter {i}: pi={pi_l:.4f}  v={v_l:.4f}")
+            if pi_l is not None and v_l is not None:
+                loss_log.text(f"Iter {i}: pi={pi_l:.4f}  v={v_l:.4f}")
+            else:
+                loss_log.text(f"Iter {i}: training finished")
 
     progress.progress(1.0, text="Training complete!")
     if chart_data['iteration']:
         st.line_chart(data={'Policy Loss': chart_data['policy_loss'],
                             'Value Loss': chart_data['value_loss']})
-    st.success(f"Trained {num_iters} iters on {game_id}")
+    best_path = os.path.join(checkpoint_dir, 'best.pth.tar')
+    st.session_state.last_trained_model = {
+        'game_id': game_id,
+        'path': best_path,
+    }
+    st.success(f"Trained {num_iters} iters on {game_id}. Saved to `{best_path}`")
 
     load_nnet.clear()
-    st.session_state.nnet = load_nnet(game_id)
+    if st.session_state.game_id == game_id:
+        st.session_state.nnet = load_nnet(game_id, best_path)
 
 
 # ================================================================
@@ -623,7 +642,34 @@ def main():
                         tag = f.replace(f"{selected}_", "").replace("_", " ")
                         available_models[f"🧪 {tag} (Best)"] = best_path
 
-        selected_label = st.selectbox("Load Model", options=list(available_models.keys()), index=0)
+        # 3. 网页端训练保存的模型
+        web_ckpt = os.path.join(_project_root, 'checkpoints', f'web_{selected}', 'best.pth.tar')
+        if selected and os.path.exists(web_ckpt):
+            available_models["🌐 Web Training (Best)"] = web_ckpt
+
+        last_trained = st.session_state.get('last_trained_model')
+        if (
+            last_trained
+            and last_trained.get('game_id') == selected
+            and os.path.exists(last_trained.get('path', ''))
+        ):
+            available_models["Just Trained"] = last_trained['path']
+
+        model_options = list(available_models.keys())
+        default_model_index = 0
+        if "Just Trained" in available_models:
+            default_model_index = model_options.index("Just Trained")
+        else:
+            for idx, label in enumerate(model_options):
+                if "Web Training" in label:
+                    default_model_index = idx
+                    break
+
+        selected_label = st.selectbox(
+            "Load Model",
+            options=model_options,
+            index=default_model_index,
+        )
 
         if st.button("New Game", type="primary"):
             if selected:
@@ -643,12 +689,18 @@ def main():
                 st.warning("rules_translator not available")
 
             if _llm_available:
-                backend_label = "LM Studio" if BACKEND == "lmstudio" else "Ollama"
+                backend_label = {
+                    "lmstudio": "LM Studio",
+                    "openai": "OpenAI-compatible",
+                }.get(BACKEND, "Ollama")
                 # 允许用户确认连接地址
-                from rules_translator import LMSTUDIO_BASE_URL, OLLAMA_BASE_URL
-                default_url = LMSTUDIO_BASE_URL if BACKEND == "lmstudio" else OLLAMA_BASE_URL
+                from rules_translator import LMSTUDIO_BASE_URL, OLLAMA_BASE_URL, OPENAI_BASE_URL
+                default_url = {
+                    "lmstudio": LMSTUDIO_BASE_URL,
+                    "openai": OPENAI_BASE_URL,
+                }.get(BACKEND, OLLAMA_BASE_URL)
                 svc_url = st.text_input("Server URL", value=default_url, key="llm_url")
-                service_ok = check_service()
+                service_ok = check_service(base_url=svc_url)
                 if service_ok:
                     st.success(f"{backend_label}: \U0001f7e2 Online")
                 else:
@@ -664,9 +716,13 @@ def main():
                     if nl_input.strip():
                         with st.spinner(f"Translating with {backend_label}..."):
                             try:
-                                rule = translate_to_json(nl_input.strip(), verbose=False)
+                                rule = translate_to_json(
+                                    nl_input.strip(),
+                                    base_url=svc_url,
+                                    verbose=False
+                                )
                                 filepath = save_rule(rule, verbose=False)
-                                rel_path = os.path.relpath(filepath, _project_root)
+                                rel_path = os.path.relpath(filepath, os.path.join(_project_root,"games"))
                                 new_game = UniversalGame(rel_path)
                                 new_id = rule.get('id', os.path.splitext(
                                     os.path.basename(filepath))[0])
@@ -677,6 +733,14 @@ def main():
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Failed: {e}")
+
+        st.divider()
+
+        # Lightweight browser-accessible training entry.
+        # This is intended for demonstrations; full experiments still use scripts.
+        with st.expander("🏋️ Training", expanded=False):
+            st.caption("Train the selected game with self-play + MCTS.")
+            training_panel(selected, available_models[selected_label])
 
         # MCTS 参数硬编码，保持 UI 极简
         mcts_args = MCTSArgs(num_mcts_sims=50, cpuct=1.0)

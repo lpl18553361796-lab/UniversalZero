@@ -20,6 +20,12 @@ source "$VENV_DIR/bin/activate"
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/games:$PROJECT_ROOT/core"
 export STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 
+# Use OpenAI / OpenAI-compatible backend for the LLM rule generator.
+# The API key is configured in rules_translator.py for the demo machine.
+export RULES_LLM_BACKEND=openai
+export OPENAI_BASE_URL=https://api.openai.com
+export OPENAI_MODEL=gpt-4o-mini
+
 echo "Starting UniversalZero..."
 echo "Open this address on the Raspberry Pi:"
 echo "  http://localhost:8501"

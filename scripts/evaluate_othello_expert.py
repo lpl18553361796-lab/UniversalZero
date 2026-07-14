@@ -1,7 +1,6 @@
 import os
 import sys
 import json
-import random
 import time
 import numpy as np
 import torch
@@ -18,43 +17,6 @@ if _project_root not in sys.path:
 from game import get_game_by_id
 from core.arena import Arena, MCTSPlayer, RandomPlayer
 from utils import dotdict
-
-
-def wilson_interval(wins, total, z=1.96):
-    if total == 0:
-        return 0.0, 0.0
-    p = wins / total
-    denominator = 1.0 + z * z / total
-    center = (p + z * z / (2.0 * total)) / denominator
-    margin = (
-        z
-        * np.sqrt(p * (1.0 - p) / total + z * z / (4.0 * total * total))
-        / denominator
-    )
-    return max(0.0, center - margin), min(1.0, center + margin)
-
-
-def play_games_with_fresh_search(game, first_player_factory, second_player_factory, num_games):
-    wins = 0
-    losses = 0
-    draws = 0
-    half = num_games // 2
-
-    for game_index in range(num_games):
-        arena = Arena(
-            game,
-            first_player_factory(),
-            second_player_factory(),
-        )
-        result = arena.play_one_game(p1_starts=(game_index < half))
-        if result > 0:
-            wins += 1
-        elif result < 0:
-            losses += 1
-        else:
-            draws += 1
-
-    return wins, losses, draws
 
 # ────────────────────────────────────────────────────────
 # 1. Original 512-channel OthelloNNet Architecture
@@ -150,7 +112,7 @@ class UniformNNet:
 # ────────────────────────────────────────────────────────
 # 4. Main Evaluation Flow
 # ────────────────────────────────────────────────────────
-def evaluate_expert(model_path, num_games=100, seed=20260607):
+def evaluate_expert(model_path, num_games=20):
     print(f"\n=======================================================")
     print(f"   UniversalZero: Othello Expert Strength Evaluation   ")
     print(f"=======================================================")
@@ -162,19 +124,13 @@ def evaluate_expert(model_path, num_games=100, seed=20260607):
     game = get_game_by_id('othello')
     action_size = game.get_action_size()
     
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
     expert_nnet = OthelloExpertWrapper(model_path)
-    expert_player_factory = lambda: MCTSPlayer(game, expert_nnet, num_sims=50)
+    expert_player = MCTSPlayer(game, expert_nnet, num_sims=50)
     
     results = {
         'model_name': os.path.basename(model_path),
         'expert_mcts_sims': 50,
         'evaluation_games_per_test': num_games,
-        'seed': seed,
-        'fresh_mcts_per_game': True,
         'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
         'benchmarks': {}
     }
@@ -183,18 +139,15 @@ def evaluate_expert(model_path, num_games=100, seed=20260607):
     # Test 1: Expert AI vs Random Player
     # ────────────────────────────────────────────────────────
     print(f"\n[Test 1] Othello Expert vs Random Player ({num_games} games)...")
+    random_player = RandomPlayer(game)
+    arena_rnd = Arena(game, expert_player, random_player)
+    
     t0 = time.time()
-    wins, losses, draws = play_games_with_fresh_search(
-        game,
-        expert_player_factory,
-        lambda: RandomPlayer(game),
-        num_games,
-    )
+    wins, losses, draws = arena_rnd.play_games(num_games)
     duration = time.time() - t0
     
     total = wins + losses + draws
     wr = wins / total if total > 0 else 0.0
-    ci_low, ci_high = wilson_interval(wins, total)
     elo = Arena.compute_elo(wins, losses, draws, base_elo=1000, opponent_elo=800)
     
     results['benchmarks']['vs_random'] = {
@@ -202,7 +155,6 @@ def evaluate_expert(model_path, num_games=100, seed=20260607):
         'losses': losses,
         'draws': draws,
         'win_rate': round(wr, 4),
-        'win_rate_ci95': [round(ci_low, 4), round(ci_high, 4)],
         'elo_rating': round(elo, 1),
         'duration_seconds': round(duration, 1)
     }
@@ -214,18 +166,15 @@ def evaluate_expert(model_path, num_games=100, seed=20260607):
     pure_sims_1 = 50
     print(f"\n[Test 2] Othello Expert vs Pure MCTS (Budget: {pure_sims_1} sims, {num_games} games)...")
     pure_nnet_1 = UniformNNet(action_size)
+    pure_player_1 = MCTSPlayer(game, pure_nnet_1, num_sims=pure_sims_1)
+    arena_pure_1 = Arena(game, expert_player, pure_player_1)
+    
     t0 = time.time()
-    wins_p1, losses_p1, draws_p1 = play_games_with_fresh_search(
-        game,
-        expert_player_factory,
-        lambda: MCTSPlayer(game, pure_nnet_1, num_sims=pure_sims_1),
-        num_games,
-    )
+    wins_p1, losses_p1, draws_p1 = arena_pure_1.play_games(num_games)
     duration_p1 = time.time() - t0
     
     total_p1 = wins_p1 + losses_p1 + draws_p1
     wr_p1 = wins_p1 / total_p1 if total_p1 > 0 else 0.0
-    ci_low_p1, ci_high_p1 = wilson_interval(wins_p1, total_p1)
     elo_p1 = Arena.compute_elo(wins_p1, losses_p1, draws_p1, base_elo=1000, opponent_elo=1000)
     
     results['benchmarks']['vs_pure_mcts_50'] = {
@@ -233,7 +182,6 @@ def evaluate_expert(model_path, num_games=100, seed=20260607):
         'losses': losses_p1,
         'draws': draws_p1,
         'win_rate': round(wr_p1, 4),
-        'win_rate_ci95': [round(ci_low_p1, 4), round(ci_high_p1, 4)],
         'elo_rating': round(elo_p1, 1),
         'duration_seconds': round(duration_p1, 1)
     }
@@ -245,18 +193,15 @@ def evaluate_expert(model_path, num_games=100, seed=20260607):
     pure_sims_2 = 100
     print(f"\n[Test 3] Othello Expert vs Pure MCTS (Budget: {pure_sims_2} sims, {num_games} games)...")
     pure_nnet_2 = UniformNNet(action_size)
+    pure_player_2 = MCTSPlayer(game, pure_nnet_2, num_sims=pure_sims_2)
+    arena_pure_2 = Arena(game, expert_player, pure_player_2)
+    
     t0 = time.time()
-    wins_p2, losses_p2, draws_p2 = play_games_with_fresh_search(
-        game,
-        expert_player_factory,
-        lambda: MCTSPlayer(game, pure_nnet_2, num_sims=pure_sims_2),
-        num_games,
-    )
+    wins_p2, losses_p2, draws_p2 = arena_pure_2.play_games(num_games)
     duration_p2 = time.time() - t0
     
     total_p2 = wins_p2 + losses_p2 + draws_p2
     wr_p2 = wins_p2 / total_p2 if total_p2 > 0 else 0.0
-    ci_low_p2, ci_high_p2 = wilson_interval(wins_p2, total_p2)
     elo_p2 = Arena.compute_elo(wins_p2, losses_p2, draws_p2, base_elo=1000, opponent_elo=1100)
     
     results['benchmarks']['vs_pure_mcts_100'] = {
@@ -264,7 +209,6 @@ def evaluate_expert(model_path, num_games=100, seed=20260607):
         'losses': losses_p2,
         'draws': draws_p2,
         'win_rate': round(wr_p2, 4),
-        'win_rate_ci95': [round(ci_low_p2, 4), round(ci_high_p2, 4)],
         'elo_rating': round(elo_p2, 1),
         'duration_seconds': round(duration_p2, 1)
     }
@@ -273,7 +217,7 @@ def evaluate_expert(model_path, num_games=100, seed=20260607):
     # Save outputs to JSON
     save_dir = 'experiment_results'
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, 'othello_expert_eval_robust.json')
+    save_path = os.path.join(save_dir, 'othello_expert_eval.json')
     with open(save_path, 'w') as f:
         json.dump(results, f, indent=2)
         
@@ -306,8 +250,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Othello Expert Evaluation Baseline')
     parser.add_argument('--model', type=str, default=default_model, help='Path to Othello expert model weights')
-    parser.add_argument('--games', type=int, default=100, help='Number of games per test suite (default: 100)')
-    parser.add_argument('--seed', type=int, default=20260607, help='Random seed')
+    parser.add_argument('--games', type=int, default=20, help='Number of games per test suite (default: 20)')
     args = parser.parse_args()
     
-    evaluate_expert(args.model, args.games, args.seed)
+    evaluate_expert(args.model, args.games)

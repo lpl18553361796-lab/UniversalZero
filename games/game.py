@@ -102,7 +102,7 @@ def register_game(name, game_class):
 # 显式导入所有游戏模块以触发 @register_game 注册
 import hex_game
 import othello_game
-import tictactoe
+
 def get_game_by_id(name, **kwargs):
     """
     根据 ID 获取游戏实例。

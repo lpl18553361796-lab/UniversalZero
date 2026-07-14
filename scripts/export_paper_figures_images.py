@@ -123,7 +123,7 @@ def save_single_benchmark_chart(filename, title, label, win_value, win_text, elo
 
 
 def othello_data():
-    report_path = os.path.join(ROOT, "experiment_results", "othello_expert_eval_robust.json")
+    report_path = os.path.join(ROOT, "experiment_results", "othello_expert_eval.json")
     report = json.load(open(report_path, encoding="utf-8"))
     order = [
         ("vs_random", "Random"),

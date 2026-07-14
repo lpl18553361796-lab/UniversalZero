@@ -2,7 +2,7 @@ import os
 import glob
 import json
 import numpy as np
-from game import Game, register_game
+from game import Game, register_game, GAME_REGISTRY
 
 
 class UnionFind:
@@ -42,7 +42,7 @@ class UniversalGame(Game):
         # --- 加载规则文件 ---
         base_dir = os.path.dirname(os.path.abspath(__file__))
         full_path = os.path.join(base_dir, json_path)
-        with open(full_path, 'r', encoding='utf-8') as f:
+        with open(full_path, 'r', encoding='utf-8-sig') as f:
             self.rules = json.load(f)
 
         # --- 解析棋盘元数据 ---
@@ -418,7 +418,8 @@ class UniversalGame(Game):
 
 # --- 自动发现并注册 rules/ 目录下的所有 JSON 游戏 ---
 _base = os.path.dirname(os.path.abspath(__file__))
-_rules_dir = os.path.join(_base, 'rules')
+_project_root = os.path.dirname(_base)
+_rules_dir = os.path.join(_project_root, 'rules')
 
 if os.path.isdir(_rules_dir):
     for _json_path in sorted(glob.glob(os.path.join(_rules_dir, '*.json'))):
@@ -427,6 +428,7 @@ if os.path.isdir(_rules_dir):
             _game = UniversalGame(_rel_path)
             # 优先使用 JSON 中的 id 字段，否则用文件名 (去扩展名)
             _game_id = _game.game_id or os.path.splitext(os.path.basename(_json_path))[0]
-            register_game(_game_id, _game)
+            if _game_id not in GAME_REGISTRY:
+                register_game(_game_id, _game)
         except Exception as e:
             print(f"[UniversalGame] Warning: failed to load {_json_path}: {e}")

@@ -13,7 +13,7 @@ if _project_root not in sys.path:
 from nnet.model import UniversalNet
 from game import GAME_REGISTRY
 
-def surgery_expert_brain(source_path, target_game_id='hex', output_path=None):
+def surgery_expert_brain(source_path, target_game_id='hex'):
     """
     高级权重手术：从 512 通道的 8x8 专家模型提取核心 DNA 注入到 64 通道的 9x9 架构
     """
@@ -76,17 +76,16 @@ def surgery_expert_brain(source_path, target_game_id='hex', output_path=None):
 
     # 4. 保存结果
     target_model.load_state_dict(target_state)
-    save_path = output_path or f"experiment_results/expert_injected_{target_game_id}.pth.tar"
-    os.makedirs(os.path.dirname(save_path) or '.', exist_ok=True)
+    if not os.path.exists("experiment_results"):
+        os.makedirs("experiment_results")
+        
+    save_path = f"experiment_results/expert_injected_{target_game_id}.pth.tar"
     torch.save({'state_dict': target_model.state_dict()}, save_path)
     
     print(f"\n--- 手术成功 ---")
     print(f"成功移植参数层数: {len(matched_layers)}")
     print(f"已生成零样本种子: {save_path}")
     print(f"提示：该种子现在包含了 Othello 的前 64 个特征通道直觉。")
-
-    return save_path
-
 
 if __name__ == "__main__":
     expert_file = "pretrained_models/othello_expert_8x8.pth.tar"

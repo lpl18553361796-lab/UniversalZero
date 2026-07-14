@@ -31,16 +31,20 @@ import requests
 
 # Ollama 后端
 OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "gemma3:4b"
+OLLAMA_MODEL = "gemma3:1b"
 
-# LM Studio 后端（OpenAI 兼容接口）
 LMSTUDIO_BASE_URL = "http://localhost:1234"
-LMSTUDIO_MODEL = "gemma-3-4b-instruct"  # 会被自动覆盖为 LM Studio 当前加载的模型
+LMSTUDIO_MODEL = "gemma-3-4b-instruct"
+
+# OpenAI / OpenAI-compatible 后端，例如 GPT 或 OpenClaw
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 RULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
 
-# 后端选择: 'ollama' 或 'lmstudio'
-BACKEND = "lmstudio"
+# 后端选择: 'ollama', 'lmstudio' 或 'openai'
+BACKEND = os.getenv("RULES_LLM_BACKEND", "openai")
 
 # ================================================================
 #  System Prompt — 强约束 Few-shot 模板
@@ -128,18 +132,26 @@ class OllamaError(RuntimeError):
     pass
 
 
-def check_service(backend: str = BACKEND, timeout_s: float = 5.0) -> bool:
-    """检查 LLM 服务是否可达（自动识别后端）"""
+def check_service(backend: str = BACKEND, base_url: str = None, timeout_s: float = 5.0) -> bool:
+    """检查 LLM 服务是否可达"""
     if backend == "lmstudio":
-        # LM Studio 使用 OpenAI 兼容的 /v1/models 接口
-        url = f"{LMSTUDIO_BASE_URL.rstrip('/')}/v1/models"
+        url = f"{(base_url or LMSTUDIO_BASE_URL).rstrip('/')}/v1/models"
+    elif backend == "openai":
+        if not OPENAI_API_KEY:
+            return False
+        url = f"{(base_url or OPENAI_BASE_URL).rstrip('/')}/v1/models"
     else:
-        url = f"{OLLAMA_BASE_URL.rstrip('/')}/api/tags"
+        url = f"{(base_url or OLLAMA_BASE_URL).rstrip('/')}/api/tags"
+
     try:
-        r = requests.get(url, timeout=timeout_s)
+        headers = {}
+        if backend == "openai":
+            headers["Authorization"] = f"Bearer {OPENAI_API_KEY}"
+        r = requests.get(url, headers=headers, timeout=timeout_s)
         return r.status_code == 200
     except requests.RequestException:
         return False
+
 
 
 def chat_once(
@@ -152,11 +164,17 @@ def chat_once(
     backend: str = BACKEND,
 ) -> str:
     """单轮非流式对话，自动根据 backend 选择 API 格式"""
-    if backend == "lmstudio":
+    if backend in ("lmstudio", "openai"):
         # OpenAI 兼容接口
-        _base = (base_url or LMSTUDIO_BASE_URL).rstrip('/')
-        _model = model or LMSTUDIO_MODEL
+        if backend == "openai":
+            _base = (base_url or OPENAI_BASE_URL).rstrip('/')
+            _model = model or OPENAI_MODEL
+        else:
+            _base = (base_url or LMSTUDIO_BASE_URL).rstrip('/')
+            _model = model or LMSTUDIO_MODEL
+
         url = f"{_base}/v1/chat/completions"
+        
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -168,8 +186,14 @@ def chat_once(
             "temperature": temperature,
             "max_tokens": 2048,
         }
+        headers = {}
+        if backend == "openai":
+            if not OPENAI_API_KEY:
+                raise OllamaError("OPENAI_API_KEY is not set.")
+            headers["Authorization"] = f"Bearer {OPENAI_API_KEY}"
+
         try:
-            r = requests.post(url, json=payload, timeout=timeout_s)
+            r = requests.post(url, headers=headers, json=payload, timeout=timeout_s)
         except requests.RequestException as e:
             raise OllamaError(f"POST /v1/chat/completions failed: {e}") from e
         if r.status_code != 200:
@@ -236,7 +260,19 @@ def extract_json(raw: str) -> Dict[str, Any]:
         text = text[first_brace:last_brace + 1]
 
     try:
-        return json.loads(text)
+        parsed = json.loads(text)
+        if isinstance(parsed, list):
+            if len(parsed) == 1 and isinstance(parsed[0], dict):
+                parsed = parsed[0]
+            else:
+                raise ValueError(
+                    f"Expected one JSON object, got a list with {len(parsed)} items."
+                )
+        if not isinstance(parsed, dict):
+            raise ValueError(f"Expected JSON object, got {type(parsed).__name__}.")
+        if isinstance(parsed.get("pieces"), list) or parsed.get("pieces") is None:
+            parsed["pieces"] = {}
+        return parsed
     except json.JSONDecodeError as e:
         raise ValueError(f"Failed to parse JSON from LLM output: {e}\nRaw:\n{raw}")
 
@@ -247,6 +283,9 @@ def validate_rule(rule: Dict[str, Any]) -> list[str]:
     返回错误列表（空列表 = 通过）。
     """
     errors = []
+
+    if not isinstance(rule, dict):
+        return [f"Rule must be a JSON object, got {type(rule).__name__}"]
 
     # 1. 顶层字段检查
     missing = REQUIRED_KEYS - set(rule.keys())
@@ -312,9 +351,12 @@ def validate_rule(rule: Dict[str, Any]) -> list[str]:
 def translate_to_json(
     user_input: str,
     max_retries: int = 2,
-    model: str = OLLAMA_MODEL,
+    model: str = None,
+    base_url: str = None,
+    backend: str = BACKEND,
     verbose: bool = True,
 ) -> Dict[str, Any]:
+
     """
     主翻译函数: 自然语言 → 结构化 JSON
 
@@ -326,7 +368,7 @@ def translate_to_json(
 
     # 第一次尝试
     t0 = time.time()
-    raw = chat_once(user_input, model=model)
+    raw = chat_once(user_input, model=model, base_url=base_url, backend=backend)
     dt = time.time() - t0
     if verbose:
         print(f"[Translator] Response received ({dt:.1f}s)")
@@ -346,7 +388,7 @@ def translate_to_json(
             )
             if verbose:
                 print(f"[Translator] JSON parse failed, retrying ({attempt+1}/{max_retries})...")
-            raw = chat_once(correction_prompt, model=model)
+            raw = chat_once(correction_prompt, model=model, base_url=base_url, backend=backend)
             continue
 
         # 校验 schema
@@ -372,7 +414,7 @@ def translate_to_json(
         if verbose:
             print(f"[Translator] Validation errors: {errors}")
             print(f"[Translator] Requesting correction ({attempt+1}/{max_retries})...")
-        raw = chat_once(correction_prompt, model=model)
+        raw = chat_once(correction_prompt, model=model, base_url=base_url, backend=backend)
 
     # Should not reach here
     raise RuntimeError("Translation failed")
@@ -410,9 +452,13 @@ def save_rule(rule: Dict[str, Any], verbose: bool = True) -> str:
 
 def verify_integration(json_path: str, verbose: bool = True) -> bool:
     """尝试用 UniversalGame 加载生成的 JSON，验证是否能成功初始化"""
+    project_dir = os.path.dirname(os.path.abspath(__file__))
+    games_dir = os.path.join(project_dir, "games")
+    if games_dir not in sys.path:
+        sys.path.insert(0, games_dir)
     from universal_game import UniversalGame
 
-    rel_path = os.path.relpath(json_path, os.path.dirname(os.path.abspath(__file__)))
+    rel_path = os.path.relpath(json_path, games_dir)
     try:
         game = UniversalGame(rel_path)
         board_size = game.get_board_size()
@@ -443,7 +489,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Natural Language -> Game Rule JSON Translator")
     ap.add_argument("--prompt", type=str, default=None,
                     help="Game description (skip interactive mode)")
-    ap.add_argument("--model", type=str, default=OLLAMA_MODEL)
+    ap.add_argument("--model", type=str, default=None)
     ap.add_argument("--non-interactive", action="store_true",
                     help="No interactive prompts; requires --prompt")
     ap.add_argument("--skip-verify", action="store_true",
@@ -454,10 +500,9 @@ def main() -> int:
     print("=" * 60)
     print("  Rules Translator — NL to JSON Pipeline")
     print("=" * 60)
-    print(f"\n[Step 0] Checking Ollama service at {OLLAMA_BASE_URL}...")
+    print(f"\n[Step 0] Checking LLM service backend={BACKEND}...")
     if not check_service():
-        print("ERROR: Ollama service not reachable. Is it running?")
-        print("  Start with: ollama serve")
+        print("ERROR: LLM service not reachable. Check API key, base URL, or local server.")
         return 1
     print("  OK — Ollama is online.")
 
@@ -479,7 +524,7 @@ def main() -> int:
             return 1
 
     # Step 2: 翻译
-    print(f"\n[Step 2] Translating with {args.model}...")
+    print(f"\n[Step 2] Translating with {args.model or OPENAI_MODEL if BACKEND == 'openai' else args.model or OLLAMA_MODEL}...")
     try:
         rule = translate_to_json(user_input, model=args.model)
     except (OllamaError, ValueError) as e:

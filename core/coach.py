@@ -1,7 +1,6 @@
 import os
 import sys
 import pickle
-import random
 import time
 import subprocess
 import numpy as np
@@ -24,14 +23,7 @@ class Coach:
     def learn(self):
         num_workers = getattr(self.args, 'num_workers', 4)
         num_eps = self.args.numEps
-        base_seed = int(getattr(self.args, 'seed', int(time.time())))
-        checkpoint_stages = {
-            int(stage) for stage in getattr(self.args, 'checkpoint_stages', [])
-        }
         metrics = []
-
-        random.seed(base_seed)
-        np.random.seed(base_seed)
         
         # 解决问题3：平均分配任务，余数分给前面的 worker
         eps_per_worker = num_eps // num_workers
@@ -68,7 +60,7 @@ class Coach:
                     '--temp_threshold', str(self.args.tempThreshold),
                     '--cpuct', str(self.args.cpuct),
                     '--output_path', output_path,
-                    '--seed', str(base_seed + i * 1000 + j)
+                    '--seed', str(int(time.time()) + j)
                 ]
                 
                 # 方案A：通过环境变量隔离 GPU，不再使用命令行参数
@@ -121,10 +113,5 @@ class Coach:
                     row[key] = float(np.mean(values)) if values else None
                 metrics.append(row)
             self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='best.pth.tar')
-            if i in checkpoint_stages:
-                self.nnet.save_checkpoint(
-                    folder=self.args.checkpoint,
-                    filename=f'stage_{i:03d}.pth.tar',
-                )
 
         return {'iterations': metrics}

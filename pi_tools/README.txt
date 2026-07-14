@@ -7,18 +7,8 @@ Copy this whole folder to the Raspberry Pi when you need the extra scripts:
 
 Record current CPU and memory usage:
 
-  chmod +x /home/lpl/UniversalZero-main/UniversalZero-main/pi_tools/record_system_usage.sh
-  bash /home/lpl/UniversalZero-main/UniversalZero-main/pi_tools/record_system_usage.sh
-
-Record CPU and memory usage continuously:
-
   chmod +x /home/lpl/UniversalZero-main/UniversalZero-main/pi_tools/monitor_system_usage.sh
-  bash /home/lpl/UniversalZero-main/UniversalZero-main/pi_tools/monitor_system_usage.sh 5 300
-
-The two numbers mean:
-
-  5   = record once every 5 seconds
-  300 = record for 300 seconds
+  bash /home/lpl/UniversalZero-main/UniversalZero-main/pi_tools/monitor_system_usage.sh
 
 Output files:
 

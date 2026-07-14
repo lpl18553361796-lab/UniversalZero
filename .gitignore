@@ -3,38 +3,25 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.venv/
+.venv
+.venv-win/
 venv/
 ENV/
 
-# Experiment artifacts: keep formal paper outputs only.
+# 实验数据与模型 (只保留目录结构，不上传大文件)
 experiment_results/*
 !experiment_results/.gitkeep
-!experiment_results/othello_expert_eval_robust.json
-!experiment_results/hex_transfer_benefit_fixed_quick_eval.json
-!experiment_results/paper_figures/
-experiment_results/paper_figures/*
-!experiment_results/paper_figures/*.png
-!experiment_results/paper_figures/*.pdf
-!experiment_results/paper_figures/*.csv
-!experiment_results/paper_figures/*.md
-!experiment_results/hex_transfer_convergence/
-experiment_results/hex_transfer_convergence/*
-!experiment_results/hex_transfer_convergence/*.csv
-!experiment_results/hex_transfer_convergence/*.json
-!experiment_results/hex_transfer_convergence/*.png
-
-# Large generated models.
 final_models/*
 !final_models/.gitkeep
 
-# Temporary training data and checkpoints.
+# 临时数据
 temp_data/
 checkpoint/
 checkpoints/
-**/temp_data/
-**/checkpoint/
-**/checkpoints/
+logs/
+model_archive/
+*.bak_codex
+*.bak_codex_*
 
 # IDE
 .vscode/
